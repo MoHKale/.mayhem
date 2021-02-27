@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Script to show battery and charging indicators.
+
+Inspired by [[https://www.reddit.com/r/unixporn/comments/lthxss/i3wm_i_made_a_frankenstein_from_other_rices/][this]] and [[https://www.reddit.com/r/unixporn/comments/lsv8lk/i3_custom_polybar_modules_wpgtk_templates/][this]] unixporn post,
+"""
+
+import sys
+import math
+import time
+
+try:
+    import psutil
+except ImportError:
+    sys.exit("Failed to import 'psutil'")
+
+def format_hearts(batt, args):
+    active_hearts = args.count * batt.percent / 100.0
+    full_hearts = math.floor(active_hearts)
+    remainder = active_hearts - full_hearts
+
+    hearts = ''
+    for threshold, st in args.thresholds:
+        if batt.percent >= threshold:
+            hearts += st
+            break
+    hearts += full_hearts * args.level[-1]
+    if remainder != 0:
+        hearts += args.level[math.ceil((len(args.level) - 2) * remainder)]
+    if full_hearts + math.ceil(remainder) < args.count:
+        hearts += (args.count - (full_hearts + math.ceil(remainder))) * args.level[0]
+    return hearts
+
+def format_charging(batt, args):
+    if args.charging is None or batt.power_plugged is None or not batt.power_plugged:
+        return ''
+
+    if batt.percent == 100 or True:  # TODO: Flashing
+        return args.charging_style + args.charging
+    return ' ' * len(args.charging)
+
+def format_alert(batt, args):
+    if batt.secsleft != psutil.POWER_TIME_UNLIMITED and \
+       batt.secsleft != psutil.POWER_TIME_UNKNOWN and \
+       batt.secsleft <= args.alert_duration:
+        return args.alert_style + args.alert
+    return ''
+
+def main(args, vargs, parser):
+    prev_out = ''
+    while True:
+        try:
+            batt = psutil.sensors_battery()
+        except:
+            batt = None
+        out = ''
+        if batt is not None:
+            hearts = format_hearts(batt, args)
+            if hearts:
+                out += hearts
+
+            for fmt in (format_charging(batt, args), format_alert(batt, args)):
+                if fmt:
+                    out += args.reset_style + '[' + fmt + args.reset_style + ']'
+
+        if out != '':
+            out = args.prefix + out + args.suffix
+        if out != prev_out:
+            print(out)
+            prev_out = out
+
+        if args.unbuffer:
+            sys.stdout.flush()
+        if args.sleep is None:
+            break
+        time.sleep(args.sleep)
+
+
+if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser()
+
+    icon_group = parser.add_argument_group('Icons')
+    icon_group.add_argument('-l', '--level',
+                            default=('E', 'H', 'F'), nargs='+', metavar='ICON',
+                            help='Specify icon list for battery value range')
+    icon_group.add_argument('-a', '--alert',
+                            metavar='ICON',
+                            help='Icon shown when battery is about to be drained')
+    icon_group.add_argument('-c', '--charging',
+                            metavar='ICON',
+                            help='Icon shown when battery is being charged')
+
+    style_group = parser.add_argument_group('Style')
+    for flag, doc in (('--reset-style', 'Reset styling applied by other styles'),
+                      ('--alert-style', 'Style for charging icon'),
+                      ('--charging-style', 'Style for charging icon'),
+                      ):
+        style_group.add_argument(flag, metavar='STYLE', default='', help=doc)
+
+    style_group.add_argument('-t', '--thresholds',
+                             nargs=2, metavar=('PERCENT', 'STYLE'),
+                             action='append', default=[],
+                             help='Specify style thresholds')
+
+    parser.add_argument('-n', '--count',
+                        type=int, default=4,
+                        help='Show COUNT many icons, dividing battery available among them')
+    parser.add_argument('-A', '--alert-duration',
+                        type=int, metavar='SECONDS', default=0,
+                        help='Duration (until battery is empty) before which alert icon is shown')
+    parser.add_argument('--suffix',
+                        metavar='STR', default='',
+                        help='Prefix output with STR when not empty')
+    parser.add_argument('--prefix',
+                        metavar='STR', default='',
+                        help='Suffix output with STR when not empty')
+    # parser.add_argument('-b', '--blink',
+    #                     type=int, default=1,
+    #                     help='Specify gaps between blinking when charging or approaching end of life')
+
+    parser.add_argument('-u', '--unbuffer', action='store_true',
+                        help='Immeadiately flush output after writing')
+    parser.add_argument('-s', '--sleep', type=int,
+                        help='When given, wait this duration between outputting')
+
+    args  = parser.parse_args()
+    vargs = vars(args)
+
+    assert len(args.level) >= 3
+    for it in args.thresholds:
+        try:
+            it[0] = float(it[0])
+        except ValueError:
+            parser.error('Threshold values must be a number, not: %s', it[0])
+    args.thresholds = sorted(args.thresholds, key=lambda x: x[0], reverse=True)
+
+    main(args, vargs, parser)

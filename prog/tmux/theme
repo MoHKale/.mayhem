@@ -134,6 +134,8 @@ set -g status-right "\
 #[default,bg=$TMUX_BG,fg=$TMUX_FG]\
 #{?#{==:#{host},#{pane_title}},,#{=/$TMUX_OPT_NAME_MAX_LEN/...:pane_title}#{?#{==:#{@theme-sep},}, ,#{@theme-sep}}}\
 \
+#(echo ''; $TMUX_HOME/cmds/battery-life -u -l ' ' 'ﯜ ' ' ' -a 'ﮏ' -c '' -s 30 --suffix '#[default,fg=$TMUX_FG]#{?#{==:#{@theme-sep},}, ,#{@theme-sep}}' --reset-style '#[none,fg=$TMUX_FG]' --alert-style '#[fg=$AOH_RED]' --charging-style '#[bold,fg=$AOH_YELLOW]' -t 0 '#[fg=$AOH_RED]' -t 20 '#[fg=$AOH_ORANGE]' -t 40 '#[fg=$AOH_YELLOW]' -t 70 '#[fg=$AOH_GREEN]')\
+\
 #(echo ""; $TMUX_HOME/cmds/disk-free -u -s 60 -b -r '#[none,fg=$TMUX_FG]' -m '#[default,bold,fg=#{@theme-df-mount}]' -t 80 '#[fg=#{@theme-df-medium}]' -t 95 '#[fg=#{@theme-df-large}]' -t 100 '#[fg=#{@theme-df-full}]')\
 \
 #[default,fg=$TMUX_FG]#{?#{==:#{@theme-sep},}, ,#{@theme-sep}}\
